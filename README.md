@@ -16,3 +16,7 @@ Unfortunately we can not modify DNS servers in real world but we can simulate a 
 More referenced materials are listed in `paper/`  
 ## Proposal 
 Edit this [overleaf link](https://www.overleaf.com/8934546512bfqsfbjjppjb) to complish proposal
+
+## TODO
+- [ ] read section 3 and 4 of this [DNS format specification](https://datatracker.ietf.org/doc/html/rfc1035) 
+- [ ] check `go-craq/dns/dns.go` for query and response format(which is the API between client and DNS servers)  
