@@ -1,6 +1,14 @@
 // define DNS query and storage format
 package dns
 
+import (
+	"fmt"
+	"log"
+	"net"
+
+	"github.com/despreston/go-craq/node"
+)
+
 type TYPE uint16
 type CLASS uint16
 
@@ -57,6 +65,10 @@ type RR struct {
 	rdata    string
 }
 
+func (rr *RR) ToBytes() []byte {
+	return nil
+}
+
 type Header struct {
 	id      int16
 	opt1    uint8 // QR Opcde AA TC RD
@@ -79,4 +91,46 @@ type Message struct {
 	header   Header
 	question Question
 	answer   Answer
+}
+
+func (msg *Message) ToBytes() []byte {
+	return nil
+}
+
+func parseQuery(query []byte) (*Message, error) {
+	return nil, nil
+}
+
+func ServeDNS(n *node.Node, port int) error {
+	listen, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.ParseIP("127.0.0.1"),
+		Port: port,
+	})
+	if err != nil {
+		log.Fatal("Failed to listen on port ", port)
+	}
+	defer listen.Close()
+	for {
+		var query [1024]byte
+		n, addr, err := listen.ReadFromUDP(query[:])
+		if err != nil {
+			log.Println("Read client query failed, err: ", err)
+			continue
+		}
+
+		// parse DNS query and reply
+		msg, err := parseQuery(query[:])
+		if err != nil {
+			log.Println("Failed to parse client query")
+			continue
+		}
+		msg.header.id = 1 // nonsense
+
+		_, err = listen.WriteToUDP(query[:n], addr)
+		if err != nil {
+			fmt.Println("Write to udp failed, err: ", err)
+			continue
+		}
+	}
+	return nil
 }
