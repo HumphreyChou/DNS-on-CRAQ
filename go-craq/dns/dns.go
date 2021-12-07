@@ -1,12 +1,11 @@
 // define DNS query and storage format
+// also define some utils for serialization and deserialization
 package dns
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/gob"
 	"log"
-	"net"
-
-	"github.com/despreston/go-craq/node"
 )
 
 type TYPE uint16
@@ -37,6 +36,7 @@ const (
 	// DNS query header options except RCODE
 	QR uint8 = 1 << 7
 	// OPCODE
+	OPCODE uint8 = 0xf << 4
 	QUERY  uint8 = 0x0 << 3
 	IQUERY uint8 = 0x1 << 3
 	STATUS uint8 = 0x2 << 3
@@ -66,7 +66,27 @@ type RR struct {
 }
 
 func (rr *RR) ToBytes() []byte {
-	return nil
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(*rr)
+	if err != nil {
+		log.Println("Failed to serialize RR, err: ", err)
+		return nil
+	}
+	return buf.Bytes()
+}
+
+func makeRR(val []byte) *RR {
+	rr := RR{}
+	var buf bytes.Buffer
+	buf.Write(val)
+	dec := gob.NewDecoder(&buf)
+	err := dec.Decode(&rr)
+	if err != nil {
+		log.Println("Failed to deserialize RR, err: ", err)
+		return nil
+	}
+	return &rr
 }
 
 type Header struct {
@@ -85,52 +105,50 @@ type Question struct {
 	qClass uint16
 }
 
-type Answer []RR
-
 type Message struct {
 	header   Header
-	question Question
-	answer   Answer
+	question []Question
+	answer   []RR
 }
 
 func (msg *Message) ToBytes() []byte {
-	return nil
-}
-
-func parseQuery(query []byte) (*Message, error) {
-	return nil, nil
-}
-
-func ServeDNS(n *node.Node, port int) error {
-	listen, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.ParseIP("127.0.0.1"),
-		Port: port,
-	})
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(*msg)
 	if err != nil {
-		log.Fatal("Failed to listen on port ", port)
+		log.Println("Failed to serialize message, err: ", err)
+		return nil
 	}
-	defer listen.Close()
-	for {
-		var query [1024]byte
-		n, addr, err := listen.ReadFromUDP(query[:])
-		if err != nil {
-			log.Println("Read client query failed, err: ", err)
-			continue
-		}
+	return buf.Bytes()
+}
 
-		// parse DNS query and reply
-		msg, err := parseQuery(query[:])
-		if err != nil {
-			log.Println("Failed to parse client query")
-			continue
-		}
-		msg.header.id = 1 // nonsense
-
-		_, err = listen.WriteToUDP(query[:n], addr)
-		if err != nil {
-			fmt.Println("Write to udp failed, err: ", err)
-			continue
-		}
+func parseQuery(query []byte) *Message {
+	msg := Message{}
+	var buf bytes.Buffer
+	buf.Write(query)
+	dec := gob.NewDecoder(&buf)
+	err := dec.Decode(&msg)
+	if err != nil {
+		log.Println("Failed to deserialize message, err: ", err)
+		return nil
 	}
-	return nil
+	// sanity check
+	log.Printf("[Query] id: %d, qdCount: %d", msg.header.id, msg.header.qdCount)
+	return &msg
+}
+
+func makeResponse(id int16, rrs []*RR) (*Message, error) {
+	header := Header{
+		id: id, opt1: 0 | QR, opt2: 0,
+		qdCount: 0, anCount: uint16(len(rrs)),
+		nsCount: 0, arCount: 0,
+	}
+	question := make([]Question, 0)
+	answer := make([]RR, len(rrs))
+	for _, rr := range rrs {
+		answer = append(answer, *rr)
+	}
+	return &Message{
+		header, question, answer,
+	}, nil
 }
