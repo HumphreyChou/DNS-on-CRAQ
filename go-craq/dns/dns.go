@@ -57,12 +57,13 @@ const (
 )
 
 type RR struct {
-	name     string
-	type_    uint16
-	class    uint16
-	ttl      uint32
-	rdLength uint16
-	rdata    string
+	name      string
+	type_     uint16
+	class     uint16
+	ttl       uint32
+	rdLength  uint16
+	rdata     string
+	timestamp int64 // not a part of standard RR
 }
 
 func (rr *RR) ToBytes() []byte {

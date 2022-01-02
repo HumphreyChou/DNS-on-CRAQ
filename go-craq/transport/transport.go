@@ -34,6 +34,7 @@ type NodeService interface {
 	BackPropagate(verByKey *PropagateRequest) (*PropagateResponse, error)
 	Commit(key string, version uint64) error
 	Read(key string) (string, []byte, error)
+	ReadRaw(key string) (string, []byte, error)
 	ReadAll() (*[]Item, error)
 }
 

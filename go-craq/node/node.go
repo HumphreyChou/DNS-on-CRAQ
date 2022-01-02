@@ -519,6 +519,21 @@ func (n *Node) Read(key string) (string, []byte, error) {
 	return key, item.Value, nil
 }
 
+// Read returns values from the store and ignore versions.
+func (n *Node) ReadRaw(key string) (string, []byte, error) {
+	item, err := n.store.ReadRaw(key)
+
+	if err != nil {
+		if err == store.ErrNotFound {
+			return "", nil, errors.New("key does not exist")
+		} else {
+			return "", nil, errors.New("unknown error when reading from storage")
+		}
+	}
+
+	return key, item.Value, nil
+}
+
 // ReadAll returns all committed key/value pairs in the store.
 func (n *Node) ReadAll() (*[]transport.Item, error) {
 	fullItems, err := n.store.AllCommitted()

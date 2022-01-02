@@ -1,11 +1,9 @@
-//go:build TTL
-// +build TTL
-
 package dns
 
 import (
 	"log"
 	"net"
+	"time"
 
 	"github.com/despreston/go-craq/node"
 )
@@ -43,8 +41,8 @@ func ServeDNS(me *node.Node, port int) error {
 		rrs := make([]*RR, msg.header.qdCount)
 		for i := 0; i < int(msg.header.qdCount); i++ {
 			question := msg.question[i]
-			// TODO: read from self and check TTL
-			key, bytes, err := me.Read(question.qName)
+			// read from self storage
+			key, bytes, err := me.ReadRaw(question.qName)
 			if err != nil {
 				log.Println("Can not read key " + question.qName)
 				continue
@@ -55,6 +53,13 @@ func ServeDNS(me *node.Node, port int) error {
 				log.Println("Failed to make RR")
 				continue
 			}
+
+			// check TTL for non-tail nodes and see if it expires
+			now := time.Now().Unix()
+			if !me.IsTail && rr.timestamp+int64(rr.ttl) < now {
+				// TODO: ask for tail/head
+			}
+
 			// check if response matches query
 			if key != question.qName || rr.type_ != question.qType || rr.class != question.qClass {
 				log.Println("RR does not match key " + question.qName)

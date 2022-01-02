@@ -46,6 +46,12 @@ func (nc *NodeClient) Read(key string) (string, []byte, error) {
 	return reply.Key, reply.Value, err
 }
 
+func (nc *NodeClient) ReadRaw(key string) (string, []byte, error) {
+	reply := &transport.Item{}
+	err := nc.Client.rpc.Call("RPC.ReadRaw", key, reply)
+	return reply.Key, reply.Value, err
+}
+
 func (nc *NodeClient) Write(key string, value []byte, version uint64) error {
 	return nc.Client.rpc.Call(
 		"RPC.Write",

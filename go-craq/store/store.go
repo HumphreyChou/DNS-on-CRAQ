@@ -24,6 +24,10 @@ type Storer interface {
 	// no item exists for that key it returns a ErrNotFound error.
 	Read(key string) (*Item, error)
 
+	// Read an item from the store by key and ignore versions. If no item exists
+	// for that key it returns a ErrNotFound error.
+	ReadRaw(key string) (*Item, error)
+
 	// Write a new item to the store.
 	Write(key string, val []byte, version uint64) error
 

@@ -72,6 +72,27 @@ func (b *Bolt) Read(key string) (*store.Item, error) {
 	return items[len(items)-1], nil
 }
 
+func (b *Bolt) ReadRaw(key string) (*store.Item, error) {
+	var result []byte
+
+	b.DB.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(b.bucket)
+		result = b.Get([]byte(key))
+		return nil
+	})
+
+	if result == nil {
+		return nil, store.ErrNotFound
+	}
+
+	items, err := store.DecodeMany(result)
+	if err != nil {
+		return nil, err
+	}
+
+	return items[len(items)-1], nil
+}
+
 func (b *Bolt) Write(key string, val []byte, version uint64) error {
 	var v []*store.Item
 	k := []byte(key)

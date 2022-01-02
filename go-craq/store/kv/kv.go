@@ -49,6 +49,19 @@ func (s *KV) Read(key string) (*store.Item, error) {
 	return items[0], nil
 }
 
+// Read an item from the store by key and ignore versions. If no item exists
+// for that key it returns a ErrNotFound error.
+func (s *KV) ReadRaw(key string) (*store.Item, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	items, has := s.lookup(key)
+	if !has {
+		return nil, store.ErrNotFound
+	}
+	return items[len(items)-1], nil
+}
+
 // ReadVersion finds an item for the given key with the matching version. If no
 // item is found for that version of key, ErrNotFound is returned
 func (s *KV) ReadVersion(key string, version uint64) (*store.Item, error) {

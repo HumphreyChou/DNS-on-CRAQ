@@ -9,7 +9,7 @@ import (
 
 	"github.com/despreston/go-craq/dns"
 	"github.com/despreston/go-craq/node"
-	"github.com/despreston/go-craq/store/boltdb"
+	"github.com/despreston/go-craq/store/kv"
 	"github.com/despreston/go-craq/transport/netrpc"
 )
 
@@ -19,16 +19,11 @@ func main() {
 	flag.StringVar(&addr, "a", ":8001", "Local address to listen on")
 	flag.StringVar(&pub, "p", ":8010", "Public address reachable by coordinator and other nodes")
 	flag.StringVar(&cdr, "c", ":8000", "Coordinator address")
-	flag.StringVar(&dbFile, "f", "craq.db", "Bolt DB database file")
+	flag.StringVar(&dbFile, "f", "dns.db", "Bolt DB database file")
 	flag.Parse()
 
 	// configure storage
-	db := boltdb.New(dbFile, "yessir")
-	if err := db.Connect(); err != nil {
-		log.Fatal(err)
-	}
-
-	defer db.DB.Close()
+	db := kv.New()
 	n := node.New(node.Opts{
 		Address:           addr,
 		CdrAddress:        cdr,
@@ -54,9 +49,10 @@ func main() {
 	if err != nil {
 		log.Fatal("Invalid listen port " + addr)
 	}
+	log.Println("Listening external calls at " + addr)
 	go dns.ServeDNS(n, port)
 
-	// wait for RPC in DNS server clusters
+	// wait for RPC in DNS servers cluster
 	log.Println("Listening internal calls at " + pub)
 	http.ListenAndServe(pub, nil)
 }
