@@ -19,7 +19,7 @@ func main() {
 	flag.StringVar(&addr, "a", ":8001", "Local address to listen on")
 	flag.StringVar(&pub, "p", ":8010", "Public address reachable by coordinator and other nodes")
 	flag.StringVar(&cdr, "c", ":8000", "Coordinator address")
-	flag.StringVar(&dbFile, "f", "dns.db", "Bolt DB database file")
+	flag.StringVar(&dbFile, "f", "dns.db", "database file")
 	flag.Parse()
 
 	// configure storage

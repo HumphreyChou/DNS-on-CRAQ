@@ -230,3 +230,12 @@ func (cdr *Coordinator) Write(key string, value []byte) error {
 	head := cdr.replicas[0]
 	return head.rpc.ClientWrite(key, value)
 }
+
+func (cdr *Coordinator) WriteRaw(key string, value []byte) error {
+	if len(cdr.replicas) < 1 {
+		return ErrEmptyChain
+	}
+
+	// Only write to tail
+	return cdr.tail.rpc.WriteRaw(key, value)
+}

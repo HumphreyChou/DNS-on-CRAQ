@@ -31,6 +31,9 @@ type Storer interface {
 	// Write a new item to the store.
 	Write(key string, val []byte, version uint64) error
 
+	// Write an item and cover the old one
+	WriteRaw(key string, val []byte) error
+
 	// Commit a version for the given key. All items with matching key and older
 	// than version are cleared.
 	Commit(key string, version uint64) error

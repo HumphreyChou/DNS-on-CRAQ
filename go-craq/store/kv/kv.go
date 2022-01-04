@@ -98,6 +98,21 @@ func (s *KV) Write(key string, val []byte, version uint64) error {
 	return nil
 }
 
+func (s *KV) WriteRaw(key string, val []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item := store.Item{
+		Committed: true,
+		Value:     val,
+		Version:   0,
+		Key:       key,
+	}
+	s.items[key] = make([]*store.Item, 1)
+	s.items[key][0] = &item
+	return nil
+}
+
 // Commit a version for the given key.
 func (s *KV) Commit(key string, version uint64) error {
 	s.mu.Lock()

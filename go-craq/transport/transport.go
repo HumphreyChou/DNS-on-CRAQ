@@ -20,6 +20,7 @@ const (
 type CoordinatorService interface {
 	AddNode(address string) (*NodeMeta, error)
 	Write(key string, value []byte) error
+	WriteRaw(key string, value []byte) error
 	RemoveNode(address string) error
 }
 
@@ -29,6 +30,7 @@ type NodeService interface {
 	Update(meta *NodeMeta) error
 	ClientWrite(key string, value []byte) error
 	Write(key string, value []byte, version uint64) error
+	WriteRaw(key string, value []byte) error
 	LatestVersion(key string) (string, uint64, error)
 	FwdPropagate(verByKey *PropagateRequest) (*PropagateResponse, error)
 	BackPropagate(verByKey *PropagateRequest) (*PropagateResponse, error)
@@ -36,6 +38,7 @@ type NodeService interface {
 	Read(key string) (string, []byte, error)
 	ReadRaw(key string) (string, []byte, error)
 	ReadAll() (*[]Item, error)
+	AskTail(key string) ([]byte, error)
 }
 
 // Client facilitates communication.

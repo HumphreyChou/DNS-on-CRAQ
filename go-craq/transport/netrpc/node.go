@@ -52,10 +52,24 @@ func (nc *NodeClient) ReadRaw(key string) (string, []byte, error) {
 	return reply.Key, reply.Value, err
 }
 
+func (nc *NodeClient) AskTail(key string) ([]byte, error) {
+	reply := &transport.Item{}
+	err := nc.Client.rpc.Call("RPC.AskTail", key, reply)
+	return reply.Value, err
+}
+
 func (nc *NodeClient) Write(key string, value []byte, version uint64) error {
 	return nc.Client.rpc.Call(
 		"RPC.Write",
 		&WriteArgs{Key: key, Value: value, Version: version},
+		&EmptyReply{},
+	)
+}
+
+func (nc *NodeClient) WriteRaw(key string, value []byte) error {
+	return nc.Client.rpc.Call(
+		"RPC.WriteRaw",
+		&WriteArgs{Key: key, Value: value, Version: 0},
 		&EmptyReply{},
 	)
 }
@@ -119,6 +133,10 @@ func (n *NodeBinding) Write(args *WriteArgs, _ *EmptyReply) error {
 	return n.Svc.Write(args.Key, args.Value, args.Version)
 }
 
+func (n *NodeBinding) WriteRaw(args *WriteArgs, _ *EmptyReply) error {
+	return n.Svc.WriteRaw(args.Key, args.Value)
+}
+
 func (n *NodeBinding) LatestVersion(key string, reply *VersionResponse) error {
 	key, version, err := n.Svc.LatestVersion(key)
 	if err != nil {
@@ -153,6 +171,25 @@ func (n *NodeBinding) Commit(args *CommitArgs, _ *EmptyReply) error {
 
 func (n *NodeBinding) Read(key string, reply *transport.Item) error {
 	key, value, err := n.Svc.Read(key)
+	if err != nil {
+		return err
+	}
+	reply.Key = key
+	reply.Value = value
+	return nil
+}
+
+func (n *NodeBinding) AskTail(key string, reply *transport.Item) error {
+	value, err := n.Svc.AskTail(key)
+	if err != nil {
+		return err
+	}
+	reply.Value = value
+	return nil
+}
+
+func (n *NodeBinding) ReadRaw(key string, reply *transport.Item) error {
+	key, value, err := n.Svc.ReadRaw(key)
 	if err != nil {
 		return err
 	}

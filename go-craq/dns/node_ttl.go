@@ -1,3 +1,6 @@
+//go:build TTL
+// +build TTL
+
 package dns
 
 import (
@@ -57,12 +60,29 @@ func ServeDNS(me *node.Node, port int) error {
 			// check TTL for non-tail nodes and see if it expires
 			now := time.Now().Unix()
 			if !me.IsTail && rr.timestamp+int64(rr.ttl) < now {
-				// TODO: ask for tail/head
+				// ask tail for latest RR
+				bytes, err = me.AskTail(question.qName)
+				if err != nil {
+					log.Println("Can not ask tail for latest version" + question.qName)
+					continue
+				}
+				rr = makeRR(bytes)
+				key = rr.name
+
+				// sanity check
+				if key != question.qName {
+					log.Printf("RR [%s] does not match key [%s]", key, question.qName)
+					continue
+				}
+
+				// store it in self database
+				rr.timestamp = time.Now().Unix()
+				me.WriteRaw(key, rr.ToBytes())
 			}
 
 			// check if response matches query
 			if key != question.qName || rr.type_ != question.qType || rr.class != question.qClass {
-				log.Println("RR does not match key " + question.qName)
+				log.Printf("RR [%s] does not match key [%s]", key, question.qName)
 				continue
 			}
 			rrs = append(rrs, rr)

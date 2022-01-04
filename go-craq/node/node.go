@@ -461,6 +461,15 @@ func (n *Node) Write(key string, val []byte, version uint64) error {
 	return nil
 }
 
+// Write an object to self database and the old object will be covered
+func (n *Node) WriteRaw(key string, value []byte) error {
+	if err := n.store.WriteRaw(key, value); err != nil {
+		n.log.Printf("Failed to write and cover. %v\n", err)
+		return err
+	}
+	return nil
+}
+
 // commitAndSend commits an item to the store and sends a message to the
 // predecessor node to tell it to commit as well.
 func (n *Node) commitAndSend(key string, version uint64) error {
@@ -517,6 +526,16 @@ func (n *Node) Read(key string) (string, []byte, error) {
 	}
 
 	return key, item.Value, nil
+}
+
+// Ask tail node for latest value, ignorance of version
+func (n *Node) AskTail(key string) ([]byte, error) {
+	_, value, err := n.neighbors[transport.NeighborPosTail].rpc.ReadRaw(key)
+	if err != nil {
+		n.log.Printf("Failed to get latest value of %s from the tail. %v\n", key, err)
+		return nil, err
+	}
+	return value, nil
 }
 
 // Read returns values from the store and ignore versions.

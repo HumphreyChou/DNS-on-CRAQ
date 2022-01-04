@@ -56,6 +56,8 @@ const (
 	REFUSED
 )
 
+const TTL uint32 = 10
+
 type RR struct {
 	name      string
 	type_     uint16
