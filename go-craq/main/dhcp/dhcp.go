@@ -15,7 +15,7 @@ import (
 func main() {
 	var addr, pub string
 
-	flag.StringVar(&addr, "a", ":8001", "Local address to listen on")
+	flag.StringVar(&addr, "a", "8000", "Local address to listen on")
 	flag.StringVar(&pub, "p", ":8010", "Public address reachable by chain nodes")
 	flag.Parse()
 
@@ -33,9 +33,8 @@ func main() {
 	// wait for client DNS requests (allocate or update IPs)
 	port, err := strconv.Atoi(addr)
 	if err != nil {
-		log.Fatal("Invalid listen port" + addr)
+		log.Fatal("Invalid listen port" + addr + err.Error())
 	}
-	log.Println("Listen external calls at " + addr)
 	go dns.ServeDHCP(c, port)
 
 	// wait for RPC in DNS servers cluster

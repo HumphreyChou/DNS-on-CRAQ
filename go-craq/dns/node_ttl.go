@@ -12,6 +12,7 @@ import (
 )
 
 func ServeDNS(me *node.Node, port int) error {
+	log.Printf("Start serving DNS query at %d\n", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,
@@ -21,12 +22,13 @@ func ServeDNS(me *node.Node, port int) error {
 	}
 	defer listen.Close()
 	for {
-		var query [1024]byte
-		_, addr, err := listen.ReadFromUDP(query[:])
+		var buf [1024]byte
+		n, addr, err := listen.ReadFromUDP(buf[:])
 		if err != nil {
 			log.Println("Read client query failed, err: ", err)
 			continue
 		}
+		query := buf[:n]
 
 		// parse DNS query and reply
 		msg := parseQuery(query[:])
@@ -35,19 +37,20 @@ func ServeDNS(me *node.Node, port int) error {
 			continue
 		}
 
-		if (msg.header.opt1&QR != 0) || (msg.header.opt1&OPCODE != QUERY) {
+		if (msg.header.Opt1&QR != 0) || (msg.header.Opt1&OPCODE != QUERY) {
 			log.Println("Not a standard DNS query")
 			continue
 		}
 
 		// read from self database and prepare an answer
-		rrs := make([]*RR, msg.header.qdCount)
-		for i := 0; i < int(msg.header.qdCount); i++ {
+		rrs := make([]*RR, msg.header.QdCount)
+		for i := 0; i < int(msg.header.QdCount); i++ {
 			question := msg.question[i]
+			name := string(question.QName[:])
 			// read from self storage
-			key, bytes, err := me.ReadRaw(question.qName)
+			key, bytes, err := me.ReadRaw(name)
 			if err != nil {
-				log.Println("Can not read key " + question.qName)
+				log.Println("Can not read key " + name)
 				continue
 			}
 
@@ -59,36 +62,36 @@ func ServeDNS(me *node.Node, port int) error {
 
 			// check TTL for non-tail nodes and see if it expires
 			now := time.Now().Unix()
-			if !me.IsTail && rr.timestamp+int64(rr.ttl) < now {
+			if !me.IsTail && rr.Timestamp+int64(rr.Ttl) < now {
 				// ask tail for latest RR
-				bytes, err = me.AskTail(question.qName)
+				bytes, err = me.AskTail(name)
 				if err != nil {
-					log.Println("Can not ask tail for latest version" + question.qName)
+					log.Println("Can not ask tail for latest version" + name)
 					continue
 				}
 				rr = makeRR(bytes)
-				key = rr.name
+				key = string(rr.Name[:])
 
 				// sanity check
-				if key != question.qName {
-					log.Printf("RR [%s] does not match key [%s]", key, question.qName)
+				if key != name {
+					log.Printf("RR [%s] does not match key [%s]", key, name)
 					continue
 				}
 
 				// store it in self database
-				rr.timestamp = time.Now().Unix()
+				rr.Timestamp = time.Now().Unix()
 				me.WriteRaw(key, rr.ToBytes())
 			}
 
 			// check if response matches query
-			if key != question.qName || rr.type_ != question.qType || rr.class != question.qClass {
-				log.Printf("RR [%s] does not match key [%s]", key, question.qName)
+			if key != name || rr.Type != question.QType || rr.Class != question.QClass {
+				log.Printf("RR [%s] does not match key [%s]", key, name)
 				continue
 			}
 			rrs = append(rrs, rr)
 		}
 
-		response, err := makeResponse(msg.header.id, rrs)
+		response, err := makeResponse(msg.header.Id, rrs)
 		if err != nil {
 			log.Println("Failed to make response message")
 			continue

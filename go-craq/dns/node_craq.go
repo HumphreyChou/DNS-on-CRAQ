@@ -8,6 +8,7 @@ import (
 )
 
 func ServeDNS(me *node.Node, port int) error {
+	log.Printf("Start serving DNS query at %d\n", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,
@@ -18,12 +19,13 @@ func ServeDNS(me *node.Node, port int) error {
 	defer listen.Close()
 
 	for {
-		var query [1024]byte
-		_, addr, err := listen.ReadFromUDP(query[:])
+		var buf [1024]byte
+		n, addr, err := listen.ReadFromUDP(buf[:])
 		if err != nil {
 			log.Println("Read client query failed, err: ", err)
 			continue
 		}
+		query := buf[:n]
 
 		// parse DNS query and reply
 		msg := parseQuery(query[:])
@@ -32,18 +34,19 @@ func ServeDNS(me *node.Node, port int) error {
 			continue
 		}
 
-		if (msg.header.opt1&QR != 0) || (msg.header.opt1&OPCODE != QUERY) {
+		if (msg.header.Opt1&QR != 0) || (msg.header.Opt1&OPCODE != QUERY) {
 			log.Println("Not a standard DNS query")
 			continue
 		}
 
 		// read from cluster database and prepare an answer
-		rrs := make([]*RR, msg.header.qdCount)
-		for i := 0; i < int(msg.header.qdCount); i++ {
+		rrs := make([]*RR, msg.header.QdCount)
+		for i := 0; i < int(msg.header.QdCount); i++ {
 			question := msg.question[i]
-			key, bytes, err := me.Read(question.qName)
+			name := string(question.QName[:])
+			key, bytes, err := me.Read(name)
 			if err != nil {
-				log.Println("Can not read key " + question.qName)
+				log.Println("Can not read key " + name)
 				continue
 			}
 
@@ -53,14 +56,14 @@ func ServeDNS(me *node.Node, port int) error {
 				continue
 			}
 			// check if response matches query
-			if key != question.qName || rr.type_ != question.qType || rr.class != question.qClass {
-				log.Println("RR does not match key " + question.qName)
+			if key != name || rr.Type != question.QType || rr.Class != question.QClass {
+				log.Println("RR does not match key " + name)
 				continue
 			}
 			rrs = append(rrs, rr)
 		}
 
-		response, err := makeResponse(msg.header.id, rrs)
+		response, err := makeResponse(msg.header.Id, rrs)
 		if err != nil {
 			log.Println("Failed to make response message")
 			continue

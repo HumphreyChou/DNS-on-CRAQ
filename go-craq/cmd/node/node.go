@@ -7,7 +7,7 @@ import (
 	"net/rpc"
 
 	"github.com/despreston/go-craq/node"
-	"github.com/despreston/go-craq/store/boltdb"
+	"github.com/despreston/go-craq/store/kv"
 	"github.com/despreston/go-craq/transport/netrpc"
 )
 
@@ -16,17 +16,19 @@ func main() {
 
 	flag.StringVar(&addr, "a", ":1235", "Local address to listen on")
 	flag.StringVar(&pub, "p", ":1235", "Public address reachable by coordinator and other nodes")
-	flag.StringVar(&cdr, "c", ":1234", "Coordinator address")
+	flag.StringVar(&cdr, "c", ":8010", "Coordinator address")
 	flag.StringVar(&dbFile, "f", "craq.db", "Bolt DB database file")
 	flag.Parse()
 
-	db := boltdb.New(dbFile, "yessir")
-	if err := db.Connect(); err != nil {
-		log.Fatal(err)
-	}
+	/*
+		db := boltdb.New(dbFile, "yessir")
+		if err := db.Connect(); err != nil {
+			log.Fatal(err)
+		}
 
-	defer db.DB.Close()
-
+		defer db.DB.Close()
+	*/
+	db := kv.New()
 	n := node.New(node.Opts{
 		Address:           addr,
 		CdrAddress:        cdr,

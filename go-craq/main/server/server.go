@@ -16,9 +16,9 @@ import (
 func main() {
 	var addr, pub, cdr, dbFile string
 
-	flag.StringVar(&addr, "a", ":8001", "Local address to listen on")
-	flag.StringVar(&pub, "p", ":8010", "Public address reachable by coordinator and other nodes")
-	flag.StringVar(&cdr, "c", ":8000", "Coordinator address")
+	flag.StringVar(&addr, "a", "8001", "Local address to listen on")
+	flag.StringVar(&pub, "p", ":9001", "Public address reachable by coordinator and other nodes")
+	flag.StringVar(&cdr, "c", ":8010", "Coordinator address")
 	flag.StringVar(&dbFile, "f", "dns.db", "database file")
 	flag.Parse()
 
@@ -49,10 +49,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Invalid listen port " + addr)
 	}
-	log.Println("Listening external calls at " + addr)
 	go dns.ServeDNS(n, port)
 
 	// wait for RPC in DNS servers cluster
 	log.Println("Listening internal calls at " + pub)
-	http.ListenAndServe(pub, nil)
+	log.Fatal(http.ListenAndServe(pub, nil))
 }

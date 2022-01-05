@@ -5,10 +5,10 @@ name_list = []
 name_map = {}
 dns_quest_id = 0
 default_TTL = 0.5
-local_ip = "192.168.1.1"
+local_ip = "127.0.0.1"
 local_port = 10000
-dhcp_ip = "192.168.2.1"
-dhcp_port = 10000
+dhcp_ip = "127.0.0.1"
+dhcp_port = 8000
 
 #read dns table file
 def read_dns_table(filename="dns_table.txt"):
@@ -22,7 +22,7 @@ def read_dns_table(filename="dns_table.txt"):
             name_list[i] = name_list[i][0]
 
 
-# print steam with oct
+# print stream with oct
 def print_oct(stream):
     stream = bytes(stream)
     for i in stream:
@@ -60,7 +60,8 @@ def dns_response_parse(msg):
     qdcount = int.from_bytes(header[4:6],byteorder="big",signed=False)
     ancount = int.from_bytes(header[6:8],byteorder="big",signed=False)
 
-    if qdcount != 1 or ancount != 1:
+    print("qdcount {}, ancount {}".format(qdcount, ancount))
+    if qdcount != 0 or ancount != 1:
         return False
     ans_start = 0
     #default qdcount == 1 and ancount == 1

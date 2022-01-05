@@ -4,7 +4,8 @@ package dns
 
 import (
 	"bytes"
-	"encoding/gob"
+	"encoding/binary"
+	"encoding/hex"
 	"log"
 )
 
@@ -59,19 +60,20 @@ const (
 const TTL uint32 = 10
 
 type RR struct {
-	name      string
-	type_     uint16
-	class     uint16
-	ttl       uint32
-	rdLength  uint16
-	rdata     string
-	timestamp int64 // not a part of standard RR
+	Name      [16]byte
+	Type      uint16
+	Class     uint16
+	Ttl       uint32
+	RdLength  uint16
+	RData     [4]byte
+	Timestamp int64 // not a part of standard RR
 }
 
+const RR_SIZE uint = 36
+
 func (rr *RR) ToBytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(*rr)
+	buf := bytes.Buffer{}
+	err := binary.Write(&buf, binary.BigEndian, *rr)
 	if err != nil {
 		log.Println("Failed to serialize RR, err: ", err)
 		return nil
@@ -81,10 +83,8 @@ func (rr *RR) ToBytes() []byte {
 
 func makeRR(val []byte) *RR {
 	rr := RR{}
-	var buf bytes.Buffer
-	buf.Write(val)
-	dec := gob.NewDecoder(&buf)
-	err := dec.Decode(&rr)
+	buf := bytes.NewBuffer(val)
+	err := binary.Read(buf, binary.BigEndian, &rr)
 	if err != nil {
 		log.Println("Failed to deserialize RR, err: ", err)
 		return nil
@@ -93,20 +93,24 @@ func makeRR(val []byte) *RR {
 }
 
 type Header struct {
-	id      int16
-	opt1    uint8 // QR Opcde AA TC RD
-	opt2    uint8 // RA Z RCODE
-	qdCount uint16
-	anCount uint16
-	nsCount uint16
-	arCount uint16
+	Id      int16
+	Opt1    uint8 // QR Opcde AA TC RD
+	Opt2    uint8 // RA Z RCODE
+	QdCount uint16
+	AnCount uint16
+	NsCount uint16
+	ArCount uint16
 }
 
+const HDR_SIZE uint = 12
+
 type Question struct {
-	qName  string
-	qType  uint16
-	qClass uint16
+	QName  [16]byte
+	QType  uint16
+	QClass uint16
 }
+
+const QUES_SIZE uint = 20
 
 type Message struct {
 	header   Header
@@ -115,38 +119,71 @@ type Message struct {
 }
 
 func (msg *Message) ToBytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	err := enc.Encode(*msg)
+	res := []byte{}
+	// serialize header
+	buf := bytes.Buffer{}
+	err := binary.Write(&buf, binary.BigEndian, msg.header)
 	if err != nil {
-		log.Println("Failed to serialize message, err: ", err)
+		log.Println("Failed to serialize header, err: ", err)
 		return nil
 	}
-	return buf.Bytes()
+	res = append(res, buf.Bytes()...)
+	// deserialize other fields
+	for _, ques := range msg.question {
+		buf = bytes.Buffer{}
+		err = binary.Write(&buf, binary.BigEndian, ques)
+		if err != nil {
+			log.Println("Failed to serialize message, err: ", err)
+			return nil
+		}
+		res = append(res, buf.Bytes()...)
+	}
+
+	for _, ans := range msg.answer {
+		buf = bytes.Buffer{}
+		err = binary.Write(&buf, binary.BigEndian, ans)
+		if err != nil {
+			log.Println("Failed to serialize message, err: ", err)
+			return nil
+		}
+		res = append(res, buf.Bytes()...)
+	}
+
+	return res
 }
 
 func parseQuery(query []byte) *Message {
-	msg := Message{}
-	var buf bytes.Buffer
-	buf.Write(query)
-	dec := gob.NewDecoder(&buf)
-	err := dec.Decode(&msg)
+	log.Println("DHCP query: " + hex.EncodeToString(query))
+	header := Header{}
+	question := make([]Question, (len(query)-int(HDR_SIZE))/int(QUES_SIZE))
+	answer := []RR{}
+	// deserialize header
+	buf := bytes.NewBuffer(query[:HDR_SIZE])
+	err := binary.Read(buf, binary.BigEndian, &header)
 	if err != nil {
-		log.Println("Failed to deserialize message, err: ", err)
+		log.Println("Failed to deserialize header, err: ", err)
 		return nil
 	}
+	// deserialize other fields, in this scenario, only questions
+	buf = bytes.NewBuffer(query[HDR_SIZE:])
+	err = binary.Read(buf, binary.BigEndian, &question)
+	if err != nil {
+		log.Println("Failed to deserialize questions, err: ", err)
+		return nil
+	}
+
 	// sanity check
-	log.Printf("[Query] id: %d, qdCount: %d", msg.header.id, msg.header.qdCount)
-	return &msg
+	log.Printf("[Query] id: %d, qdCount: %d, qName %s", header.Id, header.QdCount, string(question[0].QName[:]))
+	return &Message{header: header, question: question, answer: answer}
 }
 
 func makeResponse(id int16, rrs []*RR) (*Message, error) {
 	header := Header{
-		id: id, opt1: 0 | QR, opt2: 0,
-		qdCount: 0, anCount: uint16(len(rrs)),
-		nsCount: 0, arCount: 0,
+		Id: id, Opt1: 0 | QR, Opt2: 0,
+		QdCount: 0, AnCount: uint16(len(rrs)),
+		NsCount: 0, ArCount: 0,
 	}
-	question := make([]Question, 0)
+	question := []Question{}
 	answer := make([]RR, len(rrs))
 	for _, rr := range rrs {
 		answer = append(answer, *rr)
