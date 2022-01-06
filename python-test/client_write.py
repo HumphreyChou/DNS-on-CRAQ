@@ -79,8 +79,8 @@ def dns_build(qname, dns_id):
 # parse dns response packet
 # header    12bytes
 # query     20bytes per RR
-# answer    16bytes per RR(default)
-#       : name  2bytes
+# answer    30bytes per RR(default)
+#       : name  16bytes
 #       : type  2bytes
 #       : class 2bytes
 #       : ttl   4bytes
@@ -92,8 +92,8 @@ def dns_response_parse(msg):
 
     # parse dns response header
     header = dns_response[:12]
-    # dns_id = int.from_bytes(header[:2], byteorder="big", signed=False)
-    # flag = int.from_bytes(header[2:4], byteorder="big", signed=False)
+    # id = int.from_bytes(header[:2],byteorder="big",signed=False)
+    # flag = int.from_bytes(header[2:4],byteorder="big",signed=False)
     qdcount = int.from_bytes(header[4:6], byteorder="big", signed=False)
     ancount = int.from_bytes(header[6:8], byteorder="big", signed=False)
 
@@ -114,15 +114,15 @@ def dns_response_parse(msg):
 
     ans_start = 32
     # parse response
-    ans_record = dns_response[ans_start:ans_start+12]
-    # ans_ttl = int.from_bytes(ans_record[6:10], byteorder="big", signed=False)
-    ans_len = int.from_bytes(ans_record[10:], byteorder="big", signed=False)
+    ans_record = dns_response[ans_start:ans_start + 26]
+    # ans_ttl = int.from_bytes(ans_record[20:24], byteorder="big", signed=False)
+    ans_len = int.from_bytes(ans_record[24:], byteorder="big", signed=False)
     if ans_len != 4:
         return False
-    ans_ip = int.from_bytes(dns_response[ans_start+12:ans_start+12+ans_len], byteorder="big", signed=False)
+    ans_ip = int.from_bytes(dns_response[ans_start + 26:ans_start + 26 + ans_len], byteorder="big", signed=False)
 
     def ip_int_to_str(x: int) -> str:
-        return '.'.join([str(x//(256**i) % 256) for i in range(4)][::-1])
+        return '.'.join([str(x // (256 ** i) % 256) for i in range(4)][::-1])
 
     ip = ip_int_to_str(ans_ip)
     print("The response of %s is %s" % (name, ip))
