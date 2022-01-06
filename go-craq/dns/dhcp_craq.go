@@ -9,6 +9,12 @@ import (
 )
 
 func ServeDHCP(me *coordinator.Coordinator, port int) error {
+	// first read name-ip table
+	table, err := ReadTable()
+	if err != nil {
+		log.Fatal("Failed to read IP table")
+	}
+
 	log.Printf("Start serving DHCP request at %d", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
@@ -41,11 +47,22 @@ func ServeDHCP(me *coordinator.Coordinator, port int) error {
 			continue
 		}
 
-		// TODO: read from domain-IP table and pick an IP
+		// read from name-IP table and pick an IP
 		key := string(msg.question[0].QName[:])
+		// log.Printf("name: %s, %d", key, len(key))
 		var name [16]byte
-		ip := [4]byte{0, 0, 0, 0}
 		copy(name[:], key)
+		ip := [4]byte{}
+		if alloc, found := table[key]; found {
+			ip = alloc.ips[alloc.cur]
+			alloc.cur = (alloc.cur + 1) % uint(len(alloc.ips))
+			table[key] = alloc
+		} else {
+			log.Println("Can not allocate IP for " + key)
+			continue
+		}
+		// log.Printf("%x %x %x %x", ip[0], ip[1], ip[2], ip[3])
+
 		rr := &RR{
 			Name: name, Type: uint16(A), Class: uint16(IN),
 			Ttl: TTL, RdLength: uint16(len(ip)), RData: ip,
@@ -53,7 +70,7 @@ func ServeDHCP(me *coordinator.Coordinator, port int) error {
 		}
 		me.Write(key, rr.ToBytes()) // this call would block until all nodes have commited
 
-		response, err := makeResponse(msg.header.Id, []*RR{rr})
+		response, err := makeResponse(msg.header.Id, msg.question, []*RR{rr})
 		if err != nil {
 			log.Println("Failed to make response message")
 			continue

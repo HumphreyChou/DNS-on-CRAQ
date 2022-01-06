@@ -3,10 +3,14 @@
 package dns
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"os"
+	"strings"
 )
 
 type TYPE uint16
@@ -69,7 +73,7 @@ type RR struct {
 	Timestamp int64 // not a part of standard RR
 }
 
-const RR_SIZE uint = 36
+const RR_SIZE uint = 38
 
 func (rr *RR) ToBytes() []byte {
 	buf := bytes.Buffer{}
@@ -118,6 +122,11 @@ type Message struct {
 	answer   []RR
 }
 
+type TabbleItem struct {
+	cur uint
+	ips [][4]byte
+}
+
 func (msg *Message) ToBytes() []byte {
 	res := []byte{}
 	// serialize header
@@ -146,7 +155,7 @@ func (msg *Message) ToBytes() []byte {
 			log.Println("Failed to serialize message, err: ", err)
 			return nil
 		}
-		res = append(res, buf.Bytes()...)
+		res = append(res, buf.Bytes()[:RR_SIZE-8]...) // RRs in response should not contain timestamp
 	}
 
 	return res
@@ -173,22 +182,50 @@ func parseQuery(query []byte) *Message {
 	}
 
 	// sanity check
-	log.Printf("[Query] id: %d, qdCount: %d, qName %s", header.Id, header.QdCount, string(question[0].QName[:]))
+	log.Printf("[Query] id: %d, qdCount: %d, qName: %s", header.Id, header.QdCount, string(question[0].QName[:]))
 	return &Message{header: header, question: question, answer: answer}
 }
 
-func makeResponse(id int16, rrs []*RR) (*Message, error) {
+func makeResponse(id int16, question []Question, rrs []*RR) (*Message, error) {
 	header := Header{
 		Id: id, Opt1: 0 | QR, Opt2: 0,
-		QdCount: 0, AnCount: uint16(len(rrs)),
+		QdCount: uint16(len(question)), AnCount: uint16(len(rrs)),
 		NsCount: 0, ArCount: 0,
 	}
-	question := []Question{}
-	answer := make([]RR, len(rrs))
+	answer := []RR{}
 	for _, rr := range rrs {
 		answer = append(answer, *rr)
 	}
 	return &Message{
-		header, question, answer,
+		header: header, question: question, answer: answer,
 	}, nil
+}
+
+func ReadTable() (map[string]TabbleItem, error) {
+	file, err := os.Open("../python-test/dns_table.txt")
+	if err != nil {
+		log.Println("Can not open table file" + err.Error())
+		return nil, err
+	}
+	defer file.Close()
+
+	table := make(map[string]TabbleItem, 100)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.Split(scanner.Text(), " ")
+		name := line[0]
+		for i := len(name); i < 16; i++ {
+			name += string(0)
+		}
+		// log.Printf("%s: %d", name, len(name))
+		ips := [][4]byte{}
+		for _, ip_str := range line[1:] {
+			ip := [4]byte{}
+			fmt.Sscanf(ip_str, "%d.%d.%d.%d", &ip[0], &ip[1], &ip[2], &ip[3])
+			// log.Printf("%x %x %x %x", ip[0], ip[1], ip[2], ip[3])
+			ips = append(ips, ip)
+		}
+		table[name] = TabbleItem{cur: 0, ips: ips}
+	}
+	return table, nil
 }

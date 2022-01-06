@@ -86,7 +86,7 @@ def dns_response_parse(msg):
     ancount = int.from_bytes(header[6:8], byteorder="big", signed=False)
 
     print("qdcount {}, ancount {}".format(qdcount, ancount))
-    if qdcount != 0 or ancount != 1:
+    if qdcount != 1 or ancount != 1:
         return False
 
     # parse query domain name
@@ -147,24 +147,24 @@ if __name__ == "__main__":
         exit(0)
     dns_packet = dns_header+dns_question
     print_oct(dns_packet)
-    # sockfd = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    # sockfd.bind((local_ip,local_port))
-    # sockfd.settimeout(default_TTL)
-    # while True:
-    #     try:
-    #         start_t = time.time()
-    #         dhcp_addr = (dhcp_ip,dhcp_port)
-    #         sockfd.sendto(dns_packet,dhcp_addr)
-    #         dns_response_, addr = sockfd.recvfrom(1024)
-    #         res = dns_response_parse(dns_response_)
-    #         if res:
-    #             break
-    #     except socket.timeout:
-    #         continue
-    # sockfd.close()
-    dns_response_ = create_dns_response_for_test()
-    print_oct(dns_response_)
-    dns_response_parse(dns_response_)
+    sockfd = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    sockfd.bind((local_ip,local_port))
+    sockfd.settimeout(default_TTL)
+    while True:
+        try:
+            start_t = time.time()
+            dhcp_addr = (dhcp_ip,dhcp_port)
+            sockfd.sendto(dns_packet,dhcp_addr)
+            dns_response_, addr = sockfd.recvfrom(1024)
+            res = dns_response_parse(dns_response_)
+            if res:
+                break
+        except socket.timeout:
+            continue
+    sockfd.close()
+    # dns_response_ = create_dns_response_for_test()
+    # print_oct(dns_response_)
+    # dns_response_parse(dns_response_)
 
 
 

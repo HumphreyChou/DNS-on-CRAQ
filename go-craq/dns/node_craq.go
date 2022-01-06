@@ -63,7 +63,7 @@ func ServeDNS(me *node.Node, port int) error {
 			rrs = append(rrs, rr)
 		}
 
-		response, err := makeResponse(msg.header.Id, rrs)
+		response, err := makeResponse(msg.header.Id, msg.question, rrs)
 		if err != nil {
 			log.Println("Failed to make response message")
 			continue
