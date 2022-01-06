@@ -30,6 +30,12 @@ def print_oct(stream):
     print("")
 
 # build dns header
+# id   2bytes
+# flag 2bytes
+# qdcount  2bytes
+# ancount  2bytes
+# nscount  2bytes
+# arcount  2bytes
 def dns_header_build(id,flag = 0,qdcount = 1,ancount = 0,nscount = 0,arcount = 0):
     id = id.to_bytes(2,byteorder="big")
     flag = flag.to_bytes(2,byteorder="big")
@@ -41,14 +47,29 @@ def dns_header_build(id,flag = 0,qdcount = 1,ancount = 0,nscount = 0,arcount = 0
     return header
 
 # build dns query record
+#  qname   16 bytes
+#  qtype   2 bytes
+#  qclass  2 bytes
 def dns_question_build(qname,qtype = 1,qclass = 1):
     qname = qname.encode('ascii')
+    if len(qname) > 16:
+        return bytes(0)
+    suffix = bytes(16-len(qname))
     qtype = qtype.to_bytes(2,byteorder="big")
     qclass = qclass.to_bytes(2,byteorder="big")
-    dns_question = qname+qtype+qclass
+    dns_question = qname+suffix+qtype+qclass
     return dns_question
 
 # parse dns response packet
+# header    12bytes
+# query     20bytes per RR
+# answer    16bytes per RR(default)
+#       : name  2bytes
+#       : type  2bytes
+#       : class 2bytes
+#       : ttl   4bytes
+#       : rdlen 2bytes(default value: 4)
+#       : rdata 4bytes(ip addr)
 def dns_response_parse(msg):
     dns_response = msg
     print_oct(dns_response)
@@ -62,21 +83,21 @@ def dns_response_parse(msg):
 
     if qdcount != 1 or ancount != 1:
         return False
-    ans_start = 0
-    #default qdcount == 1 and ancount == 1
-    for i in range(16,len(dns_response)):
-        if int.from_bytes(dns_response[i-4:i],byteorder="big",signed=False) == 0x00010001:
-            ans_start = i
-            break
-    if ans_start == 0:
-        return False
+
 
     # parse query domain name
-    name = dns_response[12:ans_start-4]
+    name = dns_response[12:28]
+    name_end = 0
+    while name_end < 16:
+        if name[name_end] == 0:
+            break
+        name_end += 1
+    name = name[:name_end]
     name = name.decode('ascii')
     if name not in name_map:
         return False
 
+    ans_start = 32
     # parse response
     ans_record = dns_response[ans_start:ans_start+12]
     ans_ttl = int.from_bytes(ans_record[6:10],byteorder="big",signed=False)
@@ -108,26 +129,28 @@ if __name__ == "__main__":
     read_dns_table()
     dns_header = dns_header_build(1)
     dns_question = dns_question_build(name_list[0])
+    if dns_question == bytes(0):
+        exit(0)
     dns_packet = dns_header+dns_question
     print_oct(dns_packet)
-    sockfd = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    sockfd.bind((local_ip,local_port))
-    sockfd.settimeout(default_TTL)
-    while True:
-        try:
-            start_t = time.time()
-            dhcp_addr = (dhcp_ip,dhcp_port)
-            sockfd.sendto(dns_packet,dhcp_addr)
-            dns_response, addr = sockfd.recvfrom(1024)
-            res = dns_response_parse(dns_response)
-            if res:
-                break
-        except socket.timeout:
-            continue
-    sockfd.close()
-    # dns_response = create_dns_response_for_test()
-    # print_oct(dns_response)
-    # dns_response_parse(dns_response)
+    # sockfd = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    # sockfd.bind((local_ip,local_port))
+    # sockfd.settimeout(default_TTL)
+    # while True:
+    #     try:
+    #         start_t = time.time()
+    #         dhcp_addr = (dhcp_ip,dhcp_port)
+    #         sockfd.sendto(dns_packet,dhcp_addr)
+    #         dns_response, addr = sockfd.recvfrom(1024)
+    #         res = dns_response_parse(dns_response)
+    #         if res:
+    #             break
+    #     except socket.timeout:
+    #         continue
+    # sockfd.close()
+    dns_response = create_dns_response_for_test()
+    print_oct(dns_response)
+    dns_response_parse(dns_response)
 
 
 
