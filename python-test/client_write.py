@@ -20,10 +20,10 @@ def read_dns_table(filename="dns_table.txt"):
     with open(filename, 'r') as fd1:
         name_list = fd1.readlines()
         for i in range(len(name_list)):
-            name_list[i] = name_list[i].split(" ")
-            name_map[name_list[i][0]] = name_list[i][1]
-            name_database[name_list[i][0]] = name_list[i][1:]
-            name_list[i] = name_list[i][0]
+            tmp_list = name_list[i].split(" ")
+            name_map[tmp_list[0]] = tmp_list[1]
+            name_database[tmp_list[0]] = tmp_list[1:]
+            name_list[i] = tmp_list[0]
 
 
 # print steam with oct
@@ -145,13 +145,9 @@ def create_dns_response_for_test():
     return header+query+ans
 
 
-# write only once with the first
+# write only once with the first name
 def simple_write_test():
-    dns_header = dns_header_build(1)
-    dns_question = dns_question_build(name_list[0])
-    if dns_question == bytes(0):
-        exit(0)
-    dns_packet = dns_header+dns_question
+    dns_packet = dns_build(name_list[0], 1)
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
     sockfd.settimeout(default_TTL)
@@ -253,6 +249,7 @@ def write_all_periodic_renewal_test(t=60, interval=10, n=3):
 # t: time of test duration
 def write_rtt_test(filename, t=60):
     global dns_quest_id
+    global default_TTL
     with open(filename, 'w') as fd:
         sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sockfd.bind((local_ip, local_port))
@@ -263,7 +260,7 @@ def write_rtt_test(filename, t=60):
         while time.time() - start_time < t:
             try:
                 domain_name = name_list[sp]
-                dns_query = dns_build(domain_name,dns_quest_id)
+                dns_query = dns_build(domain_name, dns_quest_id)
                 start_rtt = time.time()
                 sockfd.sendto(dns_query, dhcp_addr)
                 dns_response, addr = sockfd.recvfrom(1024)
