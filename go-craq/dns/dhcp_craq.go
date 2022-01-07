@@ -1,3 +1,6 @@
+//go:build CRAQ
+// +build CRAQ
+
 package dns
 
 import (
@@ -15,7 +18,7 @@ func ServeDHCP(me *coordinator.Coordinator, port int) error {
 		log.Fatal("Failed to read IP table")
 	}
 
-	log.Printf("Start serving DHCP request at %d", port)
+	log.Printf("[mode CRAQ] Start serving DHCP request at %d", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,

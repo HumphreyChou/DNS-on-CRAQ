@@ -12,7 +12,7 @@ import (
 )
 
 func ServeDNS(me *node.Node, port int) error {
-	log.Printf("Start serving DNS query at %d\n", port)
+	log.Printf("[mode TTL] Start serving DNS query at %d\n", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,
@@ -43,15 +43,20 @@ func ServeDNS(me *node.Node, port int) error {
 		}
 
 		// read from self database and prepare an answer
-		rrs := make([]*RR, msg.header.QdCount)
+		rrs := []*RR{}
 		for i := 0; i < int(msg.header.QdCount); i++ {
 			question := msg.question[i]
 			name := string(question.QName[:])
 			// read from self storage
 			key, bytes, err := me.ReadRaw(name)
 			if err != nil {
-				log.Println("Can not read key " + name)
-				continue
+				log.Printf("Can not read key %s: %s, ask primary for record\n", name, err.Error())
+				bytes, err = me.AskTail(name)
+				if err != nil {
+					log.Println("Can not ask primary for latest version " + name)
+					continue
+				}
+				me.WriteRaw(name, bytes)
 			}
 
 			rr := makeRR(bytes)
@@ -59,14 +64,16 @@ func ServeDNS(me *node.Node, port int) error {
 				log.Println("Failed to make RR")
 				continue
 			}
+			key = string(rr.Name[:])
 
 			// check TTL for non-tail nodes and see if it expires
 			now := time.Now().Unix()
 			if !me.IsTail && rr.Timestamp+int64(rr.Ttl) < now {
+				log.Printf("name %s TTL expires, ask primary for latest\n", name)
 				// ask tail for latest RR
 				bytes, err = me.AskTail(name)
 				if err != nil {
-					log.Println("Can not ask tail for latest version" + name)
+					log.Println("Can not ask primary for latest version" + name)
 					continue
 				}
 				rr = makeRR(bytes)
@@ -80,7 +87,7 @@ func ServeDNS(me *node.Node, port int) error {
 
 				// store it in self database
 				rr.Timestamp = time.Now().Unix()
-				me.WriteRaw(key, rr.ToBytes())
+				me.WriteRaw(name, rr.ToBytes())
 			}
 
 			// check if response matches query
@@ -88,7 +95,12 @@ func ServeDNS(me *node.Node, port int) error {
 				log.Printf("RR [%s] does not match key [%s]", key, name)
 				continue
 			}
+
+			log.Printf("[Response] name: %s, ip: %x.%x.%x.%x\n", key, rr.RData[0], rr.RData[1], rr.RData[2], rr.RData[3])
 			rrs = append(rrs, rr)
+		}
+		if len(rrs) == 0 {
+			continue
 		}
 
 		response, err := makeResponse(msg.header.Id, msg.question, rrs)

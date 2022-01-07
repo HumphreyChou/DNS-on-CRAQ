@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -61,7 +60,7 @@ const (
 	REFUSED
 )
 
-const TTL uint32 = 10
+const TTL uint32 = 15
 
 type RR struct {
 	Name      [16]byte
@@ -162,7 +161,7 @@ func (msg *Message) ToBytes() []byte {
 }
 
 func parseQuery(query []byte) *Message {
-	log.Println("DHCP query: " + hex.EncodeToString(query))
+	// log.Println("query: " + hex.EncodeToString(query))
 	header := Header{}
 	question := make([]Question, (len(query)-int(HDR_SIZE))/int(QUES_SIZE))
 	answer := []RR{}

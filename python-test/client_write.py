@@ -6,7 +6,7 @@ name_list = []
 name_map = {}
 name_database = {}
 dns_quest_id = 0
-default_TTL = 0.5
+default_RTT = 0.5
 local_ip = "192.168.1.1"
 local_port = 10000
 dhcp_ip = "192.168.2.1"
@@ -150,7 +150,7 @@ def simple_write_test():
     dns_packet = dns_build(name_list[0], 1)
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
-    sockfd.settimeout(default_TTL)
+    sockfd.settimeout(default_RTT)
     while True:
         try:
             dhcp_addr = (dhcp_ip, dhcp_port)
@@ -167,10 +167,10 @@ def simple_write_test():
 # write all domain name, then don't change
 def write_all_test():
     global dns_quest_id
-    global default_TTL
+    global default_RTT
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
-    sockfd.settimeout(default_TTL)
+    sockfd.settimeout(default_RTT)
     dhcp_addr = (dhcp_ip, dhcp_port)
     for i in range(len(name_list)):
         dns_query = dns_build(name_list[i], dns_quest_id)
@@ -186,7 +186,7 @@ def write_all_test():
                 if res:
                     break
             except socket.timeout:
-                default_TTL += 0.1
+                default_RTT += 0.1
     sockfd.close()
 
 
@@ -194,10 +194,10 @@ def write_all_test():
 # t: run time;  interval: period;    n: the number of updating each time
 def write_all_periodic_renewal_test(t=60, interval=10, n=3):
     global dns_quest_id
-    global default_TTL
+    global default_RTT
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
-    sockfd.settimeout(default_TTL)
+    sockfd.settimeout(default_RTT)
     dhcp_addr = (dhcp_ip, dhcp_port)
 
     # init
@@ -215,7 +215,7 @@ def write_all_periodic_renewal_test(t=60, interval=10, n=3):
                 if res:
                     break
             except socket.timeout:
-                default_TTL += 0.1
+                default_RTT += 0.1
 
     sp = 0  # the start pointer of name_map in each turn
     # update n domain names
@@ -234,7 +234,7 @@ def write_all_periodic_renewal_test(t=60, interval=10, n=3):
                     if res:
                         break
                 except socket.timeout:
-                    default_TTL += 0.1
+                    default_RTT += 0.1
             # update ip
             for k in range(len(name_database[domain_name])):
                 if name_database[domain_name][k] == name_map[domain_name]:
@@ -249,11 +249,11 @@ def write_all_periodic_renewal_test(t=60, interval=10, n=3):
 # t: time of test duration
 def write_rtt_test(filename, t=60):
     global dns_quest_id
-    global default_TTL
+    global default_RTT
     with open(filename, 'w') as fd:
         sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sockfd.bind((local_ip, local_port))
-        sockfd.settimeout(default_TTL)
+        sockfd.settimeout(default_RTT)
         dhcp_addr = (dhcp_ip, dhcp_port)
         sp = 0
         start_time = time.time()
@@ -264,13 +264,14 @@ def write_rtt_test(filename, t=60):
                 start_rtt = time.time()
                 sockfd.sendto(dns_query, dhcp_addr)
                 dns_response, addr = sockfd.recvfrom(1024)
-                if int(dns_response[:2]) == dns_quest_id:
+                if int.from_bytes(dns_response[:2], byteorder='big', signed=False) == dns_quest_id:
                     end_rtt = time.time()
-                    fd.write("%s %s" % (start_rtt-start_time, end_rtt-start_rtt))
+                    fd.write("%s %s\n" % (start_rtt-start_time, end_rtt-start_rtt))
                 sp = (sp + 1) % len(name_list)
                 dns_quest_id = (dns_quest_id + 1) % 0xffff
             except socket.timeout:
-                default_TTL += 0.1
+                default_RTT += 0.1
+            time.sleep(1)
 
 
 def print_usage():
@@ -312,9 +313,9 @@ if __name__ == "__main__":
         local_port = int(sys.argv[3])
         dhcp_ip = sys.argv[4]
         dhcp_port = int(sys.argv[5])
-        time = int(sys.argv[6])
+        duration = int(sys.argv[6])
         interv = int(sys.argv[7])
-        write_all_periodic_renewal_test(time, interv)
+        write_all_periodic_renewal_test(duration, interv)
     elif sys.argv[1] == "rtt_test" and len(sys.argv) == 7:
         local_ip = sys.argv[2]
         local_port = int(sys.argv[3])

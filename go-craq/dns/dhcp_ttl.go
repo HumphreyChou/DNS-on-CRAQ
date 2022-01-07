@@ -18,7 +18,7 @@ func ServeDHCP(me *coordinator.Coordinator, port int) error {
 		log.Fatal("Failed to read IP table")
 	}
 
-	log.Printf("Start serving DHCP request at %d", port)
+	log.Printf("[mode TTL] Start serving DHCP request at %d", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,
@@ -68,9 +68,12 @@ func ServeDHCP(me *coordinator.Coordinator, port int) error {
 			Ttl: TTL, RdLength: uint16(len(ip)), RData: ip,
 			Timestamp: time.Now().Unix(),
 		}
+		log.Printf("name %s, ip %x %x %x %x\n", name, ip[0], ip[1], ip[2], ip[3])
 
 		// write this new RR to tail
-		me.WriteRaw(key, rr.ToBytes())
+		if err := me.WriteRaw(key, rr.ToBytes()); err != nil {
+			log.Printf("Can not write %s to primary\n", key)
+		}
 
 		response, err := makeResponse(msg.header.Id, msg.question, []*RR{rr})
 		if err != nil {

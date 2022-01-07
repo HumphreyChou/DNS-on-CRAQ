@@ -108,8 +108,7 @@ func (s *KV) WriteRaw(key string, val []byte) error {
 		Version:   0,
 		Key:       key,
 	}
-	s.items[key] = make([]*store.Item, 1)
-	s.items[key][0] = &item
+	s.items[key] = append(s.items[key], &item)
 	return nil
 }
 

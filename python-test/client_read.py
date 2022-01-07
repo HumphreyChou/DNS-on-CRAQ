@@ -1,16 +1,19 @@
 import socket
 import time
 import sys
+import random
 
 name_list = []
 name_map = {}
 name_database = {}
 dns_quest_id = 0
-default_TTL = 0.5
+default_RTT = 0.5
 local_ip = "192.168.1.1"
-local_port = 10000
+local_port = 10001
 server_ip = "192.168.2.1"
-server_port = 10000
+server_ports = [8000 + i for i in range(1, 10)]
+server_port = 8001
+head_port = server_ports[-1]
 
 
 # read dns table file
@@ -134,7 +137,7 @@ def simple_read_test():
     dns_packet = dns_build(name_list[0], 1)
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
-    sockfd.settimeout(default_TTL)
+    sockfd.settimeout(default_RTT)
     while True:
         try:
             server_addr = (server_ip, server_port)
@@ -151,11 +154,11 @@ def simple_read_test():
 # test read rtt
 def read_rtt_test(filename, t=60):
     global dns_quest_id
-    global default_TTL
+    global default_RTT
     with open(filename, 'w') as fd:
         sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sockfd.bind((local_ip, local_port))
-        sockfd.settimeout(default_TTL)
+        sockfd.settimeout(default_RTT)
         server_addr = (server_ip, server_port)
         start_time = time.time()
         while time.time() - start_time < t:
@@ -163,25 +166,27 @@ def read_rtt_test(filename, t=60):
                 domain_name = name_list[0]
                 dns_query = dns_build(domain_name, dns_quest_id)
                 start_rtt = time.time()
-                dns_response, addr = sockfd.sendto(dns_query, server_addr)
-                if int(dns_response[:2]) == dns_quest_id:
+                sockfd.sendto(dns_query, server_addr)
+                dns_response, addr = sockfd.recvfrom(1024)
+                if int.from_bytes(dns_response[:2], byteorder='big', signed=False) == dns_quest_id:
                     end_rtt = time.time()
-                    fd.write("%s %s" % (start_rtt - start_time, end_rtt - start_rtt))
+                    fd.write("%s %s\n" % (start_rtt - start_time, end_rtt - start_rtt))
                 dns_quest_id = (dns_quest_id + 1) % 0xffff
             except socket.timeout:
-                default_TTL += 0.1
+                fd.write("%s %s\n" % (start_rtt - start_time, default_RTT))
+                default_RTT += 0.1
+            time.sleep(2)
 
 
 # test read accuracy
 def read_accuracy_test(head_ip, head_port, filename, t=60):
     global dns_quest_id
-    global default_TTL
+    global default_RTT
     # record[t][0]: total pkt; record[t][1]: matched pkt
     record = [[0, 0]] * (t+1)
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
-    sockfd.settimeout(default_TTL)
-    server_addr = (server_ip, server_port)
+    sockfd.settimeout(default_RTT)
     head_addr = (head_ip, head_port)
 
     sp = 0
@@ -190,29 +195,38 @@ def read_accuracy_test(head_ip, head_port, filename, t=60):
         try:
             domain_name = name_list[sp]
             dns_query = dns_build(domain_name, dns_quest_id)
+            # randomly choose a node except head
+            rand_server_port = random.choice(server_ports)
+            while rand_server_port == head_port:
+                rand_server_port = random.choice(server_ports)
             start_t = time.time()
-            server_response, addr = sockfd.sendto(dns_query, server_addr)
-            head_response, addr = sockfd.sendto(dns_query, head_addr)
-            record[int(start_t)][0] += 1
+            record[int(start_t - start_time)][0] += 1
+            server_addr = (server_ip, rand_server_port)
+            sockfd.sendto(dns_query, head_addr) # MUST send to header first
+            head_response, addr = sockfd.recvfrom(1024)
+            sockfd.sendto(dns_query, server_addr)
+            server_response, addr = sockfd.recvfrom(1024)
             if server_response[58:62] == head_response[58:62]:
-                record[int(start_t)][1] += 1
+                record[int(start_t - start_time)][1] += 1
             dns_quest_id = (dns_quest_id + 1) % 0xffff
         except socket.timeout:
-            default_TTL += 0.1
+            default_RTT += 0.1
+
+        time.sleep(0.2)
 
     with open(filename, 'w') as fd:
         for i in range(t+1):
-            fd.write("%s %s %s %s" % (i, record[i][0], record[i][1], record[i][1]/record[i][0]))
+            fd.write("%s %s %s %s\n" % (i, record[i][0], record[i][1], record[i][1]/record[i][0]))
 
 
 # test read throughtput
 def read_throughput_test(filename, t=60):
     global dns_quest_id
-    global default_TTL
+    global default_RTT
     record = [0] * (t+1)
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
-    sockfd.settimeout(default_TTL)
+    sockfd.settimeout(default_RTT)
     server_addr = (server_ip, server_port)
 
     start_time = time.time()
@@ -221,16 +235,18 @@ def read_throughput_test(filename, t=60):
             domain_name = name_list[0]
             dns_query = dns_build(domain_name, dns_quest_id)
             start_t = time.time()
-            dns_response, addr = sockfd.sendto(dns_query, server_addr)
-            if int(dns_response[:2]) == dns_quest_id:
-                record[int(start_t)] += 1
+            sockfd.sendto(dns_query, server_addr)
+            dns_response, addr = sockfd.recvfrom(1024)
+            if int.from_bytes(dns_response[:2], byteorder='big', signed=False) == dns_quest_id:
+                record[int(start_t - start_time)] += 1
             dns_quest_id = (dns_quest_id + 1) % 0xffff
         except socket.timeout:
-            default_TTL += 0.1
+            default_RTT += 0.1
+        time.sleep(0.1)
 
     with open(filename, 'w') as fd:
         for i in range(t+1):
-            fd.write("%s %s" % (i, record[i]))
+            fd.write("%s %s\n" % (i, record[i]))
 
 
 def print_usage():

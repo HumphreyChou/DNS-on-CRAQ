@@ -1,3 +1,6 @@
+//go:build CRAQ
+// +build CRAQ
+
 package dns
 
 import (
@@ -8,7 +11,7 @@ import (
 )
 
 func ServeDNS(me *node.Node, port int) error {
-	log.Printf("Start serving DNS query at %d\n", port)
+	log.Printf("[mode CRAQ] Start serving DNS query at %d\n", port)
 	listen, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("127.0.0.1"),
 		Port: port,
@@ -40,7 +43,7 @@ func ServeDNS(me *node.Node, port int) error {
 		}
 
 		// read from cluster database and prepare an answer
-		rrs := make([]*RR, msg.header.QdCount)
+		rrs := []*RR{}
 		for i := 0; i < int(msg.header.QdCount); i++ {
 			question := msg.question[i]
 			name := string(question.QName[:])
@@ -60,7 +63,12 @@ func ServeDNS(me *node.Node, port int) error {
 				log.Println("RR does not match key " + name)
 				continue
 			}
+			log.Printf("[Response] name: %s, ip: %x.%x.%x.%x\n", key, rr.RData[0], rr.RData[1], rr.RData[2], rr.RData[3])
 			rrs = append(rrs, rr)
+		}
+		if len(rrs) == 0 {
+			log.Printf("No RR to answer for id %d", msg.header.Id)
+			continue
 		}
 
 		response, err := makeResponse(msg.header.Id, msg.question, rrs)
