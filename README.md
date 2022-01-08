@@ -1,4 +1,4 @@
-# DNS with Strong Consistency
+# DoCR: DNS with Strong Consistency
 
 ## What
 This is a mini-research project motivated by *PKU Computer Networks (Honor Tack) 21Fall*   
