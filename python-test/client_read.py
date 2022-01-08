@@ -11,8 +11,8 @@ default_RTT = 0.5
 local_ip = "192.168.1.1"
 local_port = 10001
 server_ip = "192.168.2.1"
-server_ports = [8000 + i for i in range(1, 10)]
-server_port = 8001
+server_ports = [8000 + i for i in range(1, 4)]
+server_port = 8002
 head_port = server_ports[-1]
 
 
@@ -183,7 +183,7 @@ def read_accuracy_test(head_ip, head_port, filename, t=60):
     global dns_quest_id
     global default_RTT
     # record[t][0]: total pkt; record[t][1]: matched pkt
-    record = [[0, 0]] * (t+1)
+    record = {}
     sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sockfd.bind((local_ip, local_port))
     sockfd.settimeout(default_RTT)
@@ -200,22 +200,26 @@ def read_accuracy_test(head_ip, head_port, filename, t=60):
             while rand_server_port == head_port:
                 rand_server_port = random.choice(server_ports)
             start_t = time.time()
-            record[int(start_t - start_time)][0] += 1
+            index = int(start_t - start_time)
+            if index in record:
+                record[index][0] += 1
+            else:
+                record[index] = [1, 0]
             server_addr = (server_ip, rand_server_port)
             sockfd.sendto(dns_query, head_addr) # MUST send to header first
             head_response, addr = sockfd.recvfrom(1024)
             sockfd.sendto(dns_query, server_addr)
             server_response, addr = sockfd.recvfrom(1024)
             if server_response[58:62] == head_response[58:62]:
-                record[int(start_t - start_time)][1] += 1
+                record[index][1] += 1
             dns_quest_id = (dns_quest_id + 1) % 0xffff
         except socket.timeout:
             default_RTT += 0.1
 
-        time.sleep(0.2)
+        time.sleep(0.05)
 
     with open(filename, 'w') as fd:
-        for i in range(t+1):
+        for i in record.keys():
             fd.write("%s %s %s %s\n" % (i, record[i][0], record[i][1], record[i][1]/record[i][0]))
 
 
