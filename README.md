@@ -12,11 +12,21 @@ Unfortunately we can not modify DNS servers in real world but we can simulate a 
 [CRAQ paper](https://www.usenix.org/legacy/event/usenix09/tech/full_papers/terrace/terrace.pdf)  
 [DNScup](https://ieeexplore.ieee.org/document/1648827) proposed a lease technique which essentially adapts a dynamic TTL  
 [ECO-DNS](https://ieeexplore.ieee.org/document/7164912) also proposed a dynamic TTL scheme  
-[DDNS RFC2136](https://datatracker.ietf.org/doc/html/rfc2136) now existing dynamic DNS update protocol which is pretty straightforward(another word for naive)  
-More referenced materials are listed in `paper/`  
-## Proposal 
-Edit this [overleaf link](https://www.overleaf.com/8934546512bfqsfbjjppjb) to complish proposal
+[DDNS RFC2136](https://datatracker.ietf.org/doc/html/rfc2136) now existing dynamic DNS update protocol which is pretty straightforward(another word for naive) 
+[DNS format specification](https://datatracker.ietf.org/doc/html/rfc1035)  
+More referenced materials are listed in `paper/` 
 
-## TODO
-- [ ] read section 3 and 4 of this [DNS format specification](https://datatracker.ietf.org/doc/html/rfc1035) 
-- [ ] check `go-craq/dns/dns.go` for query and response format(which is the API between client and DNS servers)  
+## Prerequisite
+- go: check `go-craq/go.mod`
+- python >= 3.6
+
+## Usage
+```
+cd go-craq
+make all MODE=[CRAQ|TTL]
+cd ../python-test
+python do_test.py
+``` 
+
+## Result
+Check `python-test/result/` for raw test result data
