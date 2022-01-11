@@ -181,7 +181,7 @@ func parseQuery(query []byte) *Message {
 	}
 
 	// sanity check
-	log.Printf("[Query] id: %d, qdCount: %d, qName: %s", header.Id, header.QdCount, string(question[0].QName[:]))
+	// log.Printf("[Query] id: %d, qdCount: %d, qName: %s", header.Id, header.QdCount, string(question[0].QName[:]))
 	return &Message{header: header, question: question, answer: answer}
 }
 
