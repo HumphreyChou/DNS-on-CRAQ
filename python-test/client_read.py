@@ -212,11 +212,19 @@ def read_accuracy_test(head_ip, head_port, filename, t=60):
             server_response, addr = sockfd.recvfrom(1024)
             if server_response[58:62] == head_response[58:62]:
                 record[index][1] += 1
+                print('domain name: {} -> ip: {}.{}.{}.{} CORRECT'.format(domain_name, server_response[58], server_response[59], server_response[60], server_response[61]))
+            else:
+                print('domain name: {} -> expected: {}.{}.{}.{}, recorded: {}.{}.{}.{} INCORRECT'.format(
+                    domain_name, head_response[58], head_response[59], head_response[60], head_response[61],
+                    server_response[58], server_response[59], server_response[60], server_response[61]
+                ))
             dns_quest_id = (dns_quest_id + 1) % 0xffff
+            sp = (sp + 1) % len(name_list) 
         except socket.timeout:
+            print('domain name {} response ERROR'.format(domain_name))
             default_RTT += 0.1
 
-        time.sleep(0.05)
+        time.sleep(0.5)
 
     with open(filename, 'w') as fd:
         for i in record.keys():

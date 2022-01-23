@@ -63,7 +63,7 @@ func ServeDNS(me *node.Node, port int) error {
 				log.Println("RR does not match key " + name)
 				continue
 			}
-			log.Printf("[Response] name: %s, ip: %x.%x.%x.%x\n", key, rr.RData[0], rr.RData[1], rr.RData[2], rr.RData[3])
+			// log.Printf("[Response] name: %s, ip: %x.%x.%x.%x\n", key, rr.RData[0], rr.RData[1], rr.RData[2], rr.RData[3])
 			rrs = append(rrs, rr)
 		}
 		if len(rrs) == 0 {
