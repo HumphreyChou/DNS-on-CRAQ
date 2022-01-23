@@ -29,4 +29,5 @@ python do_test.py
 ``` 
 
 ## Result
+Check `presentation/DoCR.pdf` for full story  
 Check `python-test/result/` for raw test result data
